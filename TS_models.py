@@ -4,11 +4,6 @@ import matplotlib.pyplot as plt
 from typing import Dict, List, Any, Optional, Union
 from pydantic import BaseModel
 
-parameters_ar1 = {'phi': 0.5, 'psi': None, 'const': 0, 'sigma': 1}
-
-parameters_arp = {'phi': [0.5,0.3,-0.4], 'psi': None, 'const': 0, 'sigma': 1}
-parameters_maq = {'phi': None, 'psi': [0.5,0.3,-0.4], 'const': 0, 'sigma': 1}
-parameters_arma = {'phi': [-0.5,0.4,-0.3], 'psi': [0.5,0.3,-0.4], 'const': 0, 'sigma': 1}
 
 class modelParameters(BaseModel):
     phi: Optional[List[float]] = 0
@@ -16,14 +11,11 @@ class modelParameters(BaseModel):
     const: Optional[float] = 0
     sigma: Optional[float] = 1
 
-arma_pq = modelParameters(**parameters_arma)
 
 class selectedTSM(BaseModel):
     
     parameters: modelParameters
     length: int
-    # def __init__(self, parameters: modelParameters, length):
-    #     self.length = length 
 
     def AR1(self):
         if len(self.parameters.phi)>1:
@@ -97,6 +89,16 @@ class selectedTSM(BaseModel):
             else:
                 simulated[item] = const + np.dot(phi, simulated[(item-P):item]) + np.dot(psi, noise[(item-Q):item]) + noise[item]
         return simulated
+
+
+
+
+parameters_ar1 = {'phi': 0.5, 'psi': None, 'const': 0, 'sigma': 1}
+parameters_arp = {'phi': [0.5,0.3,-0.4], 'psi': None, 'const': 0, 'sigma': 1}
+parameters_maq = {'phi': None, 'psi': [0.5,0.3,-0.4], 'const': 0, 'sigma': 1}
+parameters_arma = {'phi': [-0.5,0.4,-0.3], 'psi': [0.5,0.3,-0.4], 'const': 0, 'sigma': 1}
+arma_pq = modelParameters(**parameters_arma)
+
     
 inputs = {'parameters': parameters_arma, 'length': 20}
 selectedTSM(**inputs).ARp()
