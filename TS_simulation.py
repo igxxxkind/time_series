@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import Dict, List, Any, Optional, Union
 from pydantic import BaseModel, model_validator
-
+import statsmodels.api as sm
 
 class modelParameters(BaseModel):
     """
@@ -13,6 +13,7 @@ class modelParameters(BaseModel):
         theta (Optional[List[float]]): Coefficients for the MA part of the model. Default is [0].
         const (Optional[float]): Constant term in the model. Default is 0.
         sigma (Optional[float]): Standard deviation of the error term. Default is 1.
+        ksi (Optional[List[float]]): Coefficients for the exogenous variables. Default is [0].
     Methods:
         check_types(cls, data: Any) -> Any:
             Validates and converts the types of 'phi' and 'theta' attributes if they are provided as floats.
@@ -63,7 +64,7 @@ class simulateTSM(BaseModel):
         else:
             const = self.parameters.const
         sigma = abs(self.parameters.sigma)
-        noise = np.random.random(self.length) * sigma
+        noise = np.random.randn(self.length) * sigma
         simulated = noise.copy()
         for item in range(1,self.length):
             simulated[item] = const + phi*simulated[item-1] + noise[item]
@@ -90,7 +91,7 @@ class simulateTSM(BaseModel):
             const = self.parameters.const
         sigma = abs(self.parameters.sigma)
         M = len(phi)
-        noise = np.random.random(self.length) * sigma
+        noise = np.random.randn(self.length) * sigma
         simulated = noise.copy()
         for item in range(1,self.length):
             if item < M:
@@ -206,7 +207,7 @@ class simulateTSM(BaseModel):
         M = len(phi)
         if exog.shape[1] != len(ksi):
             raise ValueError('Exogenous variables should have the same number of columns as the number of exogenous parameters')
-        noise = np.random.random(self.length) * sigma
+        noise = np.random.randn(self.length) * sigma
         simulated = noise.copy()
         external = np.dot(ksi, exog.T) # because external part does not change with time
         for item in range(1,self.length):
@@ -263,13 +264,23 @@ parameters_arx = {'phi': 0.5, 'ksi': [1,2], 'const': None, 'sigma': 1, 'theta': 
 inputs_arx = {'parameters': parameters_arx, 'length': 20}
 
 
-
+parameters_ar1 = {'phi': 0.2, 'theta': None, 'const': 1, 'sigma': 1, 'ksi': None}
+inputs_ar = {'parameters': parameters_ar1, 'length': 200}
 test = simulateTSM(**inputs_ar).ARp()
 
-Estimate(endog = pd.DataFrame(test[1:]), exog = pd.DataFrame(test[:-1])).OLS(const = False)
+Estimate(endog = pd.DataFrame(test[1:]), exog = pd.DataFrame(test[:-1])).OLS(const = True)['beta']
+
+Estimate(endog = pd.DataFrame(test[1:]), exog = pd.DataFrame(test[:-1])).gaussianMLE(const = True)['beta']
+
+res.values[1][0]
+
 
 
 # simulateTSM(**inputs).AR1()
 # simulateTSM(**inputs).ARMA()
 # simulateTSM(**inputs).MAq()
+
+sm.tsa.AutoReg(test, lags=1, trend = 'c').fit().summary()
+
+sm.tsa.AutoReg(test, lags=1, trend = 'n').fit().summary()
 
