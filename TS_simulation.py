@@ -91,7 +91,7 @@ class simulateTSM(BaseModel):
         sigma = abs(self.parameters.sigma)
         M = len(phi)
         noise = np.random.random(self.length) * sigma
-        simulated = noise.copy() 
+        simulated = noise.copy()
         for item in range(1,self.length):
             if item < M:
                 simulated[item] = const + np.dot(phi[:item], simulated[:item]) + noise[item]
@@ -248,18 +248,25 @@ modelParameters(**parameters_arX)
 
 inputs_maq = {'parameters': parameters_maq, 'length': 20}    
 inputs_rw = {'parameters': parameters_ma_rw, 'length': 20}
+inputs_ar = {'parameters': parameters_ar1, 'length': 20}
 
 simulateTSM(**inputs_rw).RW()
 simulateTSM(**inputs_maq).RW()
+simulateTSM(**inputs_ar).ARp()
 
     
 aux_x = pd.Series(np.random.randn(20))
 aux_x2 = pd.Series(np.random.randn(20))
 aux_2x = pd.concat([aux_x, aux_x2], axis = 1)
 
-parameters_arX = {'phi': 0.5, 'ksi': [1,2], 'const': None, 'sigma': 1, 'theta': 0.2}
-inputs_arx = {'parameters': parameters_arX, 'length': 20}
-simulateTSM(**inputs_arx).ARpX(aux_2x)
+parameters_arx = {'phi': 0.5, 'ksi': [1,2], 'const': None, 'sigma': 1, 'theta': 0.2}
+inputs_arx = {'parameters': parameters_arx, 'length': 20}
+
+
+
+test = simulateTSM(**inputs_ar).ARp()
+
+Estimate(endog = pd.DataFrame(test[1:]), exog = pd.DataFrame(test[:-1])).OLS(const = False)
 
 
 # simulateTSM(**inputs).AR1()

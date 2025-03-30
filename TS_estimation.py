@@ -5,10 +5,10 @@ from pydantic import BaseModel, model_validator, Field
 import matplotlib.pyplot as plt
 from typing import Dict, List, Any, Optional, Union
 import pandas as pd
-from .TS_estimation import modelParameters
+from .TS_simulation import modelParameters
 
 
-class estimate():
+class Estimate():
     def __init__(self, endog: pd.DataFrame, exog: pd.DataFrame):
         self.endog = endog
         self.exog = exog
@@ -42,41 +42,41 @@ class estimate():
         sigma_hat = np.sqrt(residuals.T @ residuals / (len(self.endog) - len(beta))).values[0]
         cov_matrix = np.linalg.inv(X.T @ X) * sigma_hat**2
         beta_se = pd.DataFrame(np.sqrt(cov_matrix.diagonal()))
-        return beta, beta_se, fitted, residuals
-    
-    def gaussianMLE(self, const: bool = True):
         
+        return {'beta': beta, 'beta_se': beta_se, 'fitted': fitted, 'residuals': residuals}
+        
+    
+    def gMLE(self, const: bool = True) -> dict:
+        """ 
+        Gaussian Maximum Likelihood Estimation (MLE) method.
+        
+        Args:
+            const (bool, optional): boolean to indicate a presence of a constant. Defaults to True.
+
+        Returns:
+            Dictionary: contains parameter estimations, standard errors, fitted values, and residuals.
+        """
         if const:
             X = np.column_stack((np.ones(len(self.endog)), self.exog))
         else:
             X = self.exog
         y = self.endog
-        params = np.ones(X.shape[1]+1)
+        params = np.ones(X.shape[1]+1)*0.7 # parameters bor beta and sigma within the unit circle
         
         def log_likelihood(params, X, y):
-            sigma = params[-1]
-            beta = pd.DataFrame(params[:-1])
-            fitted = X @ beta
-            residuals = y - fitted
+            sigma = abs(params[-1])
+            beta = params[:-1]
+            fitted = pd.DataFrame(X @ beta)
+            residuals = (y - fitted)/sigma
+            n = len(residuals)
             
-            info = -0.5 * residuals.T @ residuals / sigma**2
-            llf = - np.log(sigma) - info
+            llf = -n/2*np.log(2*np.pi*sigma**2)-0.5*np.sum(residuals**2)
             return -llf
         
-        solver.minimize(log_likelihood, params, args=(X, endog), method='Nelder-Mead', options = {'maxiter':10000})
-            
-            
-        
-        
+        result = solver.minimize(fun=log_likelihood, x0=params, args=(X, y), method='BFGS', options={"maxiter": 10000, "disp": True})
+        fitted = pd.DataFrame(X @ result.x[:-1])
+        residuals = y - fitted
+        return {'beta': result.x, 'beta_se': np.sqrt(np.diag(result.hess_inv)), 'fitted': fitted, 'residuals': residuals}            
 
-
-
-class estimateTSM(BaseModel):
-    
-    parameters: modelParameters
-    data: np.ndarray
-    
-    class Config:
-        arbitrary_types_allowed = True
     
     

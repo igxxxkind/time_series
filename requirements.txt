@@ -1,0 +1,9 @@
+scikit-learn
+numpy
+scipy
+pydantic
+matplotlib
+typing
+pandas
+seaborn
+statsmodels
