@@ -5,6 +5,7 @@ from typing import Dict, List, Any, Optional, Union
 from pydantic import BaseModel, model_validator
 import statsmodels.api as sm
 
+
 class modelParameters(BaseModel):
     """
     Model parameters for time series models.
@@ -18,26 +19,27 @@ class modelParameters(BaseModel):
         check_types(cls, data: Any) -> Any:
             Validates and converts the types of 'phi' and 'theta' attributes if they are provided as floats.
     """
+
     phi: Optional[List[Union[float, int]]] = [0]
     theta: Optional[List[Union[float, int]]] = [0]
     const: Optional[Union[float, int]] = 0
     sigma: Optional[Union[float, int]] = 1
-    ksi: Optional[List[Union[float, int]]] = [0] # for ARX model
-    
-    @model_validator(mode='before')
+    ksi: Optional[List[Union[float, int]]] = [0]  # for ARX model
+
+    @model_validator(mode="before")
     @classmethod
     def check_types(cls, data: Any) -> Any:
-        if isinstance(data['phi'], (float, int)):
-            data['phi'] = [data['phi']]
-        if isinstance(data['theta'], (float, int)):
-            data['theta'] = [data['theta']]
-        if isinstance(data['ksi'], (float, int)):
-            data['ksi'] = [data['ksi']]
+        if isinstance(data["phi"], (float, int)):
+            data["phi"] = [data["phi"]]
+        if isinstance(data["theta"], (float, int)):
+            data["theta"] = [data["theta"]]
+        if isinstance(data["ksi"], (float, int)):
+            data["ksi"] = [data["ksi"]]
         return data
-        
+
 
 class simulateTSM(BaseModel):
-    
+
     parameters: modelParameters
     length: int
 
@@ -53,9 +55,9 @@ class simulateTSM(BaseModel):
 
         Returns:
             np.ndarray: Simulated AR(1) time series data.
-        """ 
-        if len(self.parameters.phi)>1:
-            raise TypeError('Cannot build simple model with complicated parameters')
+        """
+        if len(self.parameters.phi) > 1:
+            raise TypeError("Cannot build simple model with complicated parameters")
         phi = self.parameters.phi
         if isinstance(phi, list):
             phi = phi[0]
@@ -66,10 +68,10 @@ class simulateTSM(BaseModel):
         sigma = abs(self.parameters.sigma)
         noise = np.random.randn(self.length) * sigma
         simulated = noise.copy()
-        for item in range(1,self.length):
-            simulated[item] = const + phi*simulated[item-1] + noise[item]
+        for item in range(1, self.length):
+            simulated[item] = const + phi * simulated[item - 1] + noise[item]
         return simulated
-    
+
     def ARp(self):
         """
         Simulates a univariate AR(p) time series model.
@@ -83,7 +85,7 @@ class simulateTSM(BaseModel):
             np.ndarray: Simulated AR(p) time series data.
         """
         if not isinstance(self.parameters.phi, list):
-            raise TypeError('Cannot build complicated model with simple parameters')
+            raise TypeError("Cannot build complicated model with simple parameters")
         phi = self.parameters.phi
         if self.parameters.const is None:
             const = 0
@@ -93,13 +95,17 @@ class simulateTSM(BaseModel):
         M = len(phi)
         noise = np.random.randn(self.length) * sigma
         simulated = noise.copy()
-        for item in range(1,self.length):
+        for item in range(1, self.length):
             if item < M:
-                simulated[item] = const + np.dot(phi[:item], simulated[:item]) + noise[item]
+                simulated[item] = (
+                    const + np.dot(phi[:item], simulated[:item]) + noise[item]
+                )
             else:
-                simulated[item] = const + np.dot(phi, simulated[(item-M):item]) + noise[item]
+                simulated[item] = (
+                    const + np.dot(phi, simulated[(item - M) : item]) + noise[item]
+                )
         return simulated
-        
+
     def MAq(self):
         """
         Simulates a univariate MA(q) time series model.
@@ -123,15 +129,19 @@ class simulateTSM(BaseModel):
         if not isinstance(theta, list):
             theta = list(theta)
         M = len(theta)
-        noise = np.random.randn(self.length)*abs(sigma)
+        noise = np.random.randn(self.length) * abs(sigma)
         simulated = const + noise.copy()
-        for item in range(1,self.length):
+        for item in range(1, self.length):
             if item < M:
-                simulated[item] = const + np.dot(theta[:item], noise[:item]) + noise[item]
+                simulated[item] = (
+                    const + np.dot(theta[:item], noise[:item]) + noise[item]
+                )
             else:
-                simulated[item] = const + np.dot(theta, noise[(item-M):item]) + noise[item]
+                simulated[item] = (
+                    const + np.dot(theta, noise[(item - M) : item]) + noise[item]
+                )
         return simulated
-    
+
     def ARMA(self):
         """
         Simulates a univariate ARMA(p, q) time series model.
@@ -157,24 +167,48 @@ class simulateTSM(BaseModel):
         if not isinstance(phi, list):
             phi = list(phi)
         if (phi is None) or (theta is None):
-            raise ValueError('Both AR and MA parameters should be provided')
-        P = len(phi)   
+            raise ValueError("Both AR and MA parameters should be provided")
+        P = len(phi)
         Q = len(theta)
-        M = min(P,Q)
-        Mp = P-Q if P>Q else 0 # if number of AR parameters is greater than number of MA parameters
-        Mq = Q-P if Q>P else 0 # if number of MA parameters is greater than number of AR parameters
+        M = min(P, Q)
+        Mp = (
+            P - Q if P > Q else 0
+        )  # if number of AR parameters is greater than number of MA parameters
+        Mq = (
+            Q - P if Q > P else 0
+        )  # if number of MA parameters is greater than number of AR parameters
 
-        noise = np.random.randn(self.length)*abs(sigma)
+        noise = np.random.randn(self.length) * abs(sigma)
         simulated = const + noise.copy()
-        for item in range(1,self.length):
+        for item in range(1, self.length):
             if item < M:
-                simulated[item] = const + np.dot(phi[:item], simulated[:item]) + np.dot(theta[:item], noise[:item]) + noise[item]
-            elif Mp > 0 and item <(Mp+M):
-                simulated[item] = const + np.dot(phi[:item], simulated[:item]) + np.dot(theta, noise[(item-Q):item]) + noise[item]
-            elif Mq > 0 and item <(Mq+M):
-                simulated[item] = const + np.dot(phi, simulated[(item-P):item]) + np.dot(theta[:item], noise[:item]) + noise[item]
+                simulated[item] = (
+                    const
+                    + np.dot(phi[:item], simulated[:item])
+                    + np.dot(theta[:item], noise[:item])
+                    + noise[item]
+                )
+            elif Mp > 0 and item < (Mp + M):
+                simulated[item] = (
+                    const
+                    + np.dot(phi[:item], simulated[:item])
+                    + np.dot(theta, noise[(item - Q) : item])
+                    + noise[item]
+                )
+            elif Mq > 0 and item < (Mq + M):
+                simulated[item] = (
+                    const
+                    + np.dot(phi, simulated[(item - P) : item])
+                    + np.dot(theta[:item], noise[:item])
+                    + noise[item]
+                )
             else:
-                simulated[item] = const + np.dot(phi, simulated[(item-P):item]) + np.dot(theta, noise[(item-Q):item]) + noise[item]
+                simulated[item] = (
+                    const
+                    + np.dot(phi, simulated[(item - P) : item])
+                    + np.dot(theta, noise[(item - Q) : item])
+                    + noise[item]
+                )
         return simulated
 
     def ARpX(self, exog: pd.DataFrame):
@@ -206,15 +240,29 @@ class simulateTSM(BaseModel):
         sigma = abs(self.parameters.sigma)
         M = len(phi)
         if exog.shape[1] != len(ksi):
-            raise ValueError('Exogenous variables should have the same number of columns as the number of exogenous parameters')
+            raise ValueError(
+                "Exogenous variables should have the same number of columns as the number of exogenous parameters"
+            )
         noise = np.random.randn(self.length) * sigma
         simulated = noise.copy()
-        external = np.dot(ksi, exog.T) # because external part does not change with time
-        for item in range(1,self.length):
+        external = np.dot(
+            ksi, exog.T
+        )  # because external part does not change with time
+        for item in range(1, self.length):
             if item < M:
-                simulated[item] = const + np.dot(phi[:item], simulated[:item]) + external[item] + noise[item]
+                simulated[item] = (
+                    const
+                    + np.dot(phi[:item], simulated[:item])
+                    + external[item]
+                    + noise[item]
+                )
             else:
-                simulated[item] = const + np.dot(phi, simulated[(item-M):item]) + external[item] + noise[item]
+                simulated[item] = (
+                    const
+                    + np.dot(phi, simulated[(item - M) : item])
+                    + external[item]
+                    + noise[item]
+                )
         return simulated
 
     def RW(self, drift: bool = False):
@@ -236,51 +284,78 @@ class simulateTSM(BaseModel):
         simulated = self.MAq()
         return simulated
 
-parameters_ar1 = {'phi': 0.5, 'theta': None, 'const': 0, 'sigma': 1, 'ksi': None}
-parameters_arp = {'phi': [0.5,0.3,-0.4], 'theta': None, 'const': 0, 'sigma': 1, 'ksi': None}
-parameters_maq = {'phi': None, 'theta': [0.5,0.3,-0.4], 'const': 0, 'sigma': 1, 'ksi': None}
-parameters_arma = {'phi': [-0.5,0.4,-0.3], 'theta': [0.5,0.3,-0.4], 'const': 0, 'sigma': 1, 'ksi': None}
-parameters_ma_rw = {'phi': None, 'theta': [0.5,0.3,-0.4], 'const': 0, 'sigma': 1, 'ksi': None}
 
-parameters_arX = {'phi': 0.5, 'ksi': 1, 'const': 0, 'sigma': 1, 'theta': 0.2}
+parameters_ar1 = {"phi": 0.5, "theta": None, "const": 0, "sigma": 1, "ksi": None}
+parameters_arp = {
+    "phi": [0.5, 0.3, -0.4],
+    "theta": None,
+    "const": 0,
+    "sigma": 1,
+    "ksi": None,
+}
+parameters_maq = {
+    "phi": None,
+    "theta": [0.5, 0.3, -0.4],
+    "const": 0,
+    "sigma": 1,
+    "ksi": None,
+}
+parameters_arma = {
+    "phi": [-0.5, 0.4, -0.3],
+    "theta": [0.5, 0.3, -0.4],
+    "const": 0,
+    "sigma": 1,
+    "ksi": None,
+}
+parameters_ma_rw = {
+    "phi": None,
+    "theta": [0.5, 0.3, -0.4],
+    "const": 0,
+    "sigma": 1,
+    "ksi": None,
+}
 
-modelParameters(**parameters_arX) 
+parameters_arX = {"phi": 0.5, "ksi": 1, "const": 0, "sigma": 1, "theta": 0.2}
+
+modelParameters(**parameters_arX)
 
 
-inputs_maq = {'parameters': parameters_maq, 'length': 20}    
-inputs_rw = {'parameters': parameters_ma_rw, 'length': 20}
-inputs_ar = {'parameters': parameters_ar1, 'length': 20}
+inputs_maq = {"parameters": parameters_maq, "length": 20}
+inputs_rw = {"parameters": parameters_ma_rw, "length": 20}
+inputs_ar = {"parameters": parameters_ar1, "length": 20}
 
 simulateTSM(**inputs_rw).RW()
 simulateTSM(**inputs_maq).RW()
 simulateTSM(**inputs_ar).ARp()
 
-    
+
 aux_x = pd.Series(np.random.randn(20))
 aux_x2 = pd.Series(np.random.randn(20))
-aux_2x = pd.concat([aux_x, aux_x2], axis = 1)
+aux_2x = pd.concat([aux_x, aux_x2], axis=1)
 
-parameters_arx = {'phi': 0.5, 'ksi': [1,2], 'const': None, 'sigma': 1, 'theta': 0.2}
-inputs_arx = {'parameters': parameters_arx, 'length': 20}
+parameters_arx = {"phi": 0.5, "ksi": [1, 2], "const": None, "sigma": 1, "theta": 0.2}
+inputs_arx = {"parameters": parameters_arx, "length": 20}
 
 
-parameters_ar1 = {'phi': 0.2, 'theta': None, 'const': 1, 'sigma': 1, 'ksi': None}
-inputs_ar = {'parameters': parameters_ar1, 'length': 200}
+parameters_ar1 = {"phi": 0.2, "theta": None, "const": 1, "sigma": 1, "ksi": None}
+inputs_ar = {"parameters": parameters_ar1, "length": 200}
 test = simulateTSM(**inputs_ar).ARp()
 
-Estimate(endog = pd.DataFrame(test[1:]), exog = pd.DataFrame(test[:-1])).OLS(const = True)['beta']
+Estimate(endog=pd.DataFrame(test[1:]), exog=pd.DataFrame(test[:-1])).OLS(const=True)[
+    "beta"
+]
 
-Estimate(endog = pd.DataFrame(test[1:]), exog = pd.DataFrame(test[:-1])).gaussianMLE(const = True)['beta']
+Estimate(endog=pd.DataFrame(test[1:]), exog=pd.DataFrame(test[:-1])).gaussianMLE(
+    const=True
+)["beta"]
 
 res.values[1][0]
-
 
 
 # simulateTSM(**inputs).AR1()
 # simulateTSM(**inputs).ARMA()
 # simulateTSM(**inputs).MAq()
 
-sm.tsa.AutoReg(test, lags=1, trend = 'c').fit().summary()
+sm.tsa.AutoReg(test, lags=1, trend="c").fit().summary()
 
-sm.tsa.AutoReg(test, lags=1, trend = 'n').fit().summary()
-
+sm.tsa.AutoReg(test, lags=1, trend="n").fit().summary()
