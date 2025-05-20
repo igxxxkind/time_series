@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from typing import Dict, List, Any, Optional, Union
 from pydantic import BaseModel, model_validator
 import statsmodels.api as sm
-from likelihoods import gaussian_log_likelihood
+from time_series.likelihoods import gaussian_log_likelihood
 
 class modelParameters(BaseModel):
     """

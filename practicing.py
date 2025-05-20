@@ -1,5 +1,6 @@
-from TS_estimation import Estimate
-from TS_simulation import modelParameters, simulateTSM
+from time_series.estimators import Estimate
+from time_series.likelihoods import gaussian_log_likelihood
+from time_series.TS_simulation import modelParameters, simulateTSM
 if __name__ == "__main__":
 # Example usage
     parameters_ar1 = {"phi": 0.5, "theta": None, "const": 0, "sigma": 1, "ksi": None}
@@ -71,7 +72,7 @@ if __name__ == "__main__":
     inputs_rw = {"parameters": parameters_ma_rw, "length": 20}
     inputs_ar = {"parameters": parameters_ar1, "length": 20}
 
-    simulateTSM(**inputs_rw).RW()
+    test = simulateTSM(**inputs_rw).RW()
     simulateTSM(**inputs_maq).RW()
     simulateTSM(**inputs_ar).ARp()
 
