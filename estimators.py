@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from typing import Dict, List, Any, Optional, Union
 import pandas as pd
 from TS_simulation import modelParameters
-from time.series.likelihoods import gaussian_log_likelihood
+from time_series.likelihoods import gaussian_log_likelihood
 from matplotlib import pyplot as plt
 
 class Estimators():
