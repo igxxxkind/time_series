@@ -5,7 +5,7 @@ from pydantic import BaseModel, model_validator, Field
 import matplotlib.pyplot as plt
 from typing import Dict, List, Any, Optional, Union
 import pandas as pd
-from TS_simulation import modelParameters
+from time_series.AR_models import modelParameters
 from time_series.likelihoods import gaussian_log_likelihood
 from matplotlib import pyplot as plt
 

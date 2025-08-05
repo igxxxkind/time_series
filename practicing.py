@@ -1,6 +1,6 @@
 from time_series.estimators import Estimate
 from time_series.likelihoods import gaussian_log_likelihood
-from time_series.TS_simulation import modelParameters, simulateTSM
+from time_series.AR_models import modelParameters, simulateTSM
 if __name__ == "__main__":
 # Example usage
     parameters_ar1 = {"phi": 0.5, "theta": None, "const": 0, "sigma": 1, "ksi": None}
