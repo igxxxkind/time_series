@@ -79,27 +79,29 @@ if __name__ == "__main__":
     # simulation
     np.random.seed(42)
     phi1 = 0.5
-    phi2 = -1.5
+    phi2 = -1
     
-    noise = stats.t.rvs(df=30, loc = 1, scale=1, size = 200)
+    noise = stats.t.rvs(df=30, loc = 0, scale=1, size = 200)
     data = noise.copy()
     transition = np.zeros(data.shape)
     
     for i in range(1, len(data)):
-        transition[i] = logistic_transition_function(data[i-1], 10.1, 2)
+        transition[i] = logistic_transition_function(data[i-1], 2, 1)
         # data[i] = phi1 * data[i-1] + (phi2 - phi1) *data[i-1]* transition[i] + noise[i]
         data[i] = phi1 * data[i-1] + phi2*data[i-1]* transition[i] + noise[i]
     
     
 
     # 3. Initial guess (unconstrained)
-    initial_guess = [1, 1]
+    initial_guess = [1, 0]
     trigger = data[:-1].copy()
     # 4. Unconstrained optimization (no bounds, no constraints)
     result = minimize(star1_mle, initial_guess, args=(trigger, data,), method='BFGS')
     est_params = result.x
     beta,X,_ = star1_model(est_params, trigger, data)
-    data_fit = X @ beta
+    transition_fit = 1/logistic_transition_function(trigger, est_params[0], est_params[1])
+    X_ = np.insert(X,0,[0,0],axis=0)
+    data_fit = X_ @ beta
     
     # visualize the data
     plt.figure(figsize=(10, 5))
