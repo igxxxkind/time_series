@@ -18,8 +18,8 @@ from scipy.optimize import minimize
 # \gamma - smoothness parameter reflecting the speed of transition between regimes
 # large \gamma - instanteneous change of the regimes
 
-def logistic_transition_function(s, gamma, c):
-    return 1 / (1 + np.exp(-gamma * (s - c)))
+def logistic_transition_function(s_t, gamma, c):
+    return 1 / (1 + np.exp(-gamma * (s_t - c)))
 
 def star1_model(parameters, trigger, data):
     """A simple STAR1 model with the logistic transition function.
@@ -35,13 +35,13 @@ def star1_model(parameters, trigger, data):
         data (_type_): data
     """
     gamma, c = parameters
-    trigger = data[:-1].copy()
+    
     transition = logistic_transition_function(trigger, gamma, c)
     
     # y = phi1 y_t-1 + phi2 y_t-1 * transition + epsilon_t
     
     # params = np.array([phi1, phi2])
-    X = np.column_stack([data[:-1], data[:-1]*transition])
+    X = np.column_stack([(data*(1-transition))[:-1], (data*transition)[:-1]])
     
     beta = np.linalg.inv(X.T @ X)@X.T @ data[1:]
     y_fit = X @ beta
@@ -51,25 +51,16 @@ def star1_model(parameters, trigger, data):
     
     return beta, X, residuals
 
-def star1_mle(params, trigger, data):
+def star1_mle(parameters, trigger, data):
     
-    beta, X, residuals = star1_model(params, trigger, data)
+    _, _, residuals = star1_model(parameters, trigger, data)
     
-    sigma = np.std(residuals)
-    residuals /= sigma
-    n = len(residuals)
-    llf = -n / 2 * np.log(2 * np.pi * sigma**2) - 0.5 * np.sum(residuals**2)
-    return -llf
-
-
-    
-    
-    
-    
-    
-
-
-    
+    # sigma = np.std(residuals)
+    # # residuals /= sigma
+    # n = len(residuals)
+    # llf = -n / 2 * np.log(2 * np.pi * sigma**2) - 0.5 * np.sum(residuals**2)
+          
+    return sum(residuals**2)
 
 
 
@@ -78,28 +69,30 @@ def star1_mle(params, trigger, data):
 if __name__ == "__main__":
     # simulation
     np.random.seed(42)
-    phi1 = 0.5
-    phi2 = -1
+    phi1 = 0.4
+    phi2 = -0.4
     
     noise = stats.t.rvs(df=30, loc = 0, scale=1, size = 200)
     data = noise.copy()
-    transition = np.zeros(data.shape)
+    
+    shift = np.arange(0,200,1)
+    transition = logistic_transition_function(shift, 0.1, 100)
     
     for i in range(1, len(data)):
-        transition[i] = logistic_transition_function(data[i-1], 2, 1)
-        # data[i] = phi1 * data[i-1] + (phi2 - phi1) *data[i-1]* transition[i] + noise[i]
-        data[i] = phi1 * data[i-1] + phi2*data[i-1]* transition[i] + noise[i]
+        data[i] = phi1 * data[i-1] * (1-transition[i]) + phi2*data[i-1]* transition[i] + noise[i]
     
     
 
     # 3. Initial guess (unconstrained)
-    initial_guess = [1, 0]
-    trigger = data[:-1].copy()
+    initial_guess = [1, 100]
+    trigger = shift.copy()
     # 4. Unconstrained optimization (no bounds, no constraints)
     result = minimize(star1_mle, initial_guess, args=(trigger, data,), method='BFGS')
+    print(result.fun)
+    # multimodal optimization problem that requires a grtid of starting values to find the global minimum
     est_params = result.x
     beta,X,_ = star1_model(est_params, trigger, data)
-    transition_fit = 1/logistic_transition_function(trigger, est_params[0], est_params[1])
+    # transition_fit = 1/logistic_transition_function(trigger, est_params[0], est_params[1])
     X_ = np.insert(X,0,[0,0],axis=0)
     data_fit = X_ @ beta
     
@@ -114,3 +107,10 @@ if __name__ == "__main__":
     plt.legend()
     plt.show()
     print("Simulation complete.")
+    
+    
+    
+    
+    
+    
+    
