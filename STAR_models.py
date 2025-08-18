@@ -49,6 +49,7 @@ def star1_model(parameters, trigger, data):
     residuals = data[1:] - y_fit
     # sigma = np.std(residuals)
     
+    
     return beta, X, residuals
 
 def star1_mle(parameters, trigger, data):
@@ -76,7 +77,7 @@ if __name__ == "__main__":
     data = noise.copy()
     
     shift = np.arange(0,200,1)
-    transition = logistic_transition_function(shift, 0.1, 100)
+    transition = logistic_transition_function(shift, 50, 100)
     
     for i in range(1, len(data)):
         data[i] = phi1 * data[i-1] * (1-transition[i]) + phi2*data[i-1]* transition[i] + noise[i]
@@ -84,7 +85,7 @@ if __name__ == "__main__":
     
 
     # 3. Initial guess (unconstrained)
-    initial_guess = [1, 100]
+    initial_guess = [0.1, 100]
     trigger = shift.copy()
     # 4. Unconstrained optimization (no bounds, no constraints)
     result = minimize(star1_mle, initial_guess, args=(trigger, data,), method='BFGS')
@@ -95,6 +96,21 @@ if __name__ == "__main__":
     # transition_fit = 1/logistic_transition_function(trigger, est_params[0], est_params[1])
     X_ = np.insert(X,0,[0,0],axis=0)
     data_fit = X_ @ beta
+    # 5. Iterate over a grid of starting values
+    x=np.arange(1,101)
+    y=np.arange(1,200,2)
+    iterations= pd.DataFrame(columns=["X", "Y", "Z"])
+    iterations.X=np.repeat(x,100)
+    iterations.Y=np.tile(y,100)
+    for i in range(0,10000):
+        initial_guess = [iterations.iloc[i,0], iterations.iloc[i,1]]
+        try:
+            result = minimize(star1_mle, initial_guess, args=(trigger, data,), method='Nelder-Mead')
+            iterations.iloc[i,2] = result.fun.copy()
+        except:
+            iterations.iloc[i,2] = np.nan
+            continue    
+    
     
     # visualize the data
     plt.figure(figsize=(10, 5))
@@ -110,7 +126,31 @@ if __name__ == "__main__":
     
     
     
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+
+    # Pivot to wide format
+    pivot = iterations.pivot(index="Y", columns="X", values="Z")
+
+    X, Y = np.meshgrid(pivot.columns, pivot.index)
+    Z = pivot.values
+
+    # Plot
+    fig = plt.figure(figsize=(16, 12))
+    ax = fig.add_subplot(111, projection="3d")
+    surf = ax.plot_surface(X, Y, Z, cmap="viridis")
+
+    fig.colorbar(surf)
+    plt.show()
     
     
-    
-    
+    plt.figure(figsize=(10, 5))
+    plt.plot(pivot.loc[:,50].dropna(), label='Simulated Data')
+    # plt.plot(data_fit, label='fitted Data',color='red')
+    # plt.plot(transition, label='Transition Variable', linestyle='--')
+    plt.title('Simulated STAR1 Model Data')
+    plt.xlabel('Time')
+    plt.ylabel('Value')
+    plt.legend()
+    plt.show()
+    print("Simulation complete.")
