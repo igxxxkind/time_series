@@ -1,5 +1,5 @@
 # This file is a training ground for STAR and LSTAR models
-
+from pydantic import BaseModel
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
@@ -18,9 +18,51 @@ from scipy.optimize import minimize
 # \gamma - smoothness parameter reflecting the speed of transition between regimes
 # large \gamma - instanteneous change of the regimes
 
-def logistic_transition_function(s_t, gamma, c):
-    return 1 / (1 + np.exp(-gamma * (s_t - c)))
+class transition_function(BaseModel):
+    shift: np.ndarray
+    gamma: float
+    threshold: float
+    def logistic(self):
+        return 1 / (1 + np.exp(-self.gamma * (self.shift - self.threshold)))
+    def exponential(self):
+        return 1 / (1 + np.exp(-self.gamma * (self.shift - self.threshold))**2)
+    def second_order_logistic(self, threshold2):
+        return 1 / (1 + np.exp(-self.gamma * (self.shift - self.threshold)*(self.shift - self.threshold2)))
+    class Config:
+        arbitrary_types_allowed = True
 
+
+class STARmodel(BaseModel):
+    phi1: float
+    phi2: float
+    gamma: float
+    threshold: float
+    shift: np.ndarray
+    data: np.ndarray
+    
+    class Config:
+        arbitrary_types_allowed = True
+
+    def fit(self, type: str = "logistic", noise: str='normal'):
+        transition_params={"shift": self.shift,
+                           "gamma": self.gamma,
+                           "threshold": self.threshold}
+        
+        trigger = getattr(transition_function(**transition_params), type)()
+        
+        
+    
+    def simulate(self, type: str = "logistic", noise: str='normal'):
+        if noise == "normal":
+            noise = stats.norm.rvs(size=len(self.data))
+        else:
+            ValueError("Unsupported noise distribution")
+        transition_params={"shift": self.shift,
+                           "gamma": self.gamma,
+                           "threshold": self.threshold}
+        pass       
+        
+        
 def star1_model(parameters, trigger, data):
     """A simple STAR1 model with the logistic transition function.
     The idea is to isolate gamma and c parameters from the model, leaving
@@ -68,6 +110,11 @@ def star1_mle(parameters, trigger, data):
 
 
 if __name__ == "__main__":
+    
+    
+    transition_params= {"shift": np.arange(0,20), "gamma": 10, "threshold":9}
+    a=transition_function(**params)
+
     # simulation
     np.random.seed(42)
     phi1 = 0.4
@@ -154,3 +201,8 @@ if __name__ == "__main__":
     plt.legend()
     plt.show()
     print("Simulation complete.")
+    
+    
+    
+    
+    
