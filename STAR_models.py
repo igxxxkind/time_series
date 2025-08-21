@@ -1,12 +1,14 @@
 # This file is a training ground for STAR and LSTAR models
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
+from typing import List, Union, Any, Optional, Dict
+from time_series import likelihoods
 #General form of a STAR model follows tre following structure:
-# y_t = \phi_1 * y(t) *(1 - G(s_t, \gamma, c)) + \phi_2 * y(t) *G(s_t, \gamma, c) + \epsilon_t
+# y_t = C + \phi_1 * y(t) *(1 - G(s_t, \gamma, c)) + \phi_2 * y(t) *G(s_t, \gamma, c) + \epsilon_t
 # \phi_1 = phi_1_0 + phi_1_1L + phi_1_2L^2 + ... + phi_1_pL^p
 # \phi_2 = phi_2_0 + phi_2_1L + phi_2_2L^2 + ... + phi_2_pL^p
 # where G(s_t, \gamma, c) is a smooth transition function, 
@@ -18,7 +20,7 @@ from scipy.optimize import minimize
 # \gamma - smoothness parameter reflecting the speed of transition between regimes
 # large \gamma - instanteneous change of the regimes
 
-class transition_function(BaseModel):
+class Transition_function(BaseModel):
     shift: np.ndarray
     gamma: float
     threshold: float
@@ -31,27 +33,59 @@ class transition_function(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
+class Design_matrix_ar(BaseModel):
+    y: np.ndarray
+    n_params: int = Field(..., description="Number of AR parameters")
+    const: bool = Field(..., description="Include constant term in the design matrix")
+    
+    class Config:
+        arbitrary_types_allowed = True
+    
+    def create(self) -> pd.DataFrame:
+        X = pd.DataFrame(self.y, columns=['y'])
+        if not self.const:
+            for item in range(self.n_params):
+                X[f'lag_{item+1}'] = np.roll(self.y, item+1)
+            X=X.iloc[len(self.n_params):,].drop('y',axis=1)
+        else:
+            X['const']=1
+            for item in range(self.n_params-1):
+                X[f'lag_{item+1}'] = np.roll(self.y, item+1)
+            X=X.iloc[(self.n_params-1):,].drop('y',axis=1)
 
+        return X
+
+    
 class STARmodel(BaseModel):
-    phi1: float
-    phi2: float
-    gamma: float
-    threshold: float
-    shift: np.ndarray
-    data: np.ndarray
+    params: List[float] = Field(..., description="Model Parameters")
+    shift: np.ndarray = Field(..., description="Transition data")
+    data: np.ndarray = Field(..., description="Actual data")
     
     class Config:
         arbitrary_types_allowed = True
 
-    def fit(self, type: str = "logistic", noise: str='normal'):
-        transition_params={"shift": self.shift,
-                           "gamma": self.gamma,
-                           "threshold": self.threshold}
-        
-        trigger = getattr(transition_function(**transition_params), type)()
-        
-        
+    ll_parameters=params[:-2]
     
+    def fit(self, type: str = "logistic", noise: str='gaussian', const=True) -> Dict[Any, Any]:
+        transition_params={"shift": self.shift,
+                           "gamma": self.params[-2],
+                           "threshold": self.params[-1]}
+        
+        trigger = getattr(Transition_function(**transition_params), type)()
+        # tail section of params vector contains: [..., sigma, gamma, threshold]]
+        X = Design_matrix_ar(y=self.data, n_params=len(self.params)-3, const=const).create()
+        temp = len(trigger) - X.shape[0]
+        X_g = X.copy().mul(trigger[temp:], axis='rows').drop('const',axis=1)
+        X_g.columns = [f'{col}_g' for col in X_g.columns]
+        X_full = X.join(X_g)
+        init_params = self.params[:-2]
+        likelihood = likelihoods.Likelihood(params=init_params, X=X_full, y=self.data)
+        if noise != 'gaissian':
+            pass
+        
+        # to be finalized
+        result = minimize(likelihood.gaussian, init_params, method='Nelder-Mead')
+        
     def simulate(self, type: str = "logistic", noise: str='normal'):
         if noise == "normal":
             noise = stats.norm.rvs(size=len(self.data))
