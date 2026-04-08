@@ -5,7 +5,7 @@ from math import gamma
 from typing import List, Union, Any
 
 class Likelihood(BaseModel):
-    params: List[float] = Field(..., description="Model Parameters")
+    params: np.ndarray = Field(..., description="Model Parameters")
     X: pd.DataFrame = Field(..., description='Design Matrix')
     y: pd.DataFrame = Field(..., description="Data Series")
     class Config:

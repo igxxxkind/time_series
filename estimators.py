@@ -75,7 +75,7 @@ class Estimators():
             np.ones(X.shape[1]+ 1) * 0.7
         )  # parameters bor beta and sigma within the unit circle
         if  gaussian:
-            loglikelihood = Likelihood(params=params.tolist(), X=pd.DataFrame(X), y=y)
+            loglikelihood = Likelihood(params=params, X=pd.DataFrame(X), y=y)
         else:
             pass
         result = solver.minimize(
