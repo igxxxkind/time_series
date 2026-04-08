@@ -99,12 +99,5 @@ if __name__ == "__main__":
         "beta"
     ]
 
-   
-
-
-    # simulateTSM(**inputs).AR1()
-    # simulateTSM(**inputs).ARMA()
-    # simulateTSM(**inputs).MAq()
-
     sm.tsa.AutoReg(test, lags=1, trend="c").fit().summary()
 

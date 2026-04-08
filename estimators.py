@@ -35,14 +35,16 @@ class Estimators():
             X = np.column_stack((np.ones(len(self.endog)), self.exog))
         else:
             X = self.exog
-        beta = np.linalg.inv(X.T @ X) @ X.T @ self.endog
+        y = self.endog    
+        
+        beta = np.linalg.inv(X.T @ X) @ X.T @ y
 
         fitted = X @ beta
-        residuals = self.endog - fitted
+        residuals = y - fitted
 
         sigma_hat = np.sqrt(
-            residuals.T @ residuals / (len(self.endog) - len(beta))
-        ).values[0]
+            residuals.T @ residuals / (len(y) - len(beta))
+        ).values.item()
         cov_matrix = np.linalg.inv(X.T @ X) * sigma_hat**2
         beta_se = pd.DataFrame(np.sqrt(cov_matrix.diagonal()))
 
@@ -92,10 +94,7 @@ class Estimators():
         }
         
     
-
-
-    
-# if __name__ == "__main__":
+if __name__ == "__main__":
     
     
-    
+    pass
