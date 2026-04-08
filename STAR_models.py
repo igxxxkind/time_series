@@ -46,55 +46,79 @@ class Design_matrix_ar(BaseModel):
         if not self.const:
             for item in range(self.n_params):
                 X[f'lag_{item+1}'] = np.roll(self.y, item+1)
-            X=X.iloc[len(self.n_params):,].drop('y',axis=1)
+                X[f'lag_{item+1}'].iloc[:(item+1)] = np.nan
+            # X=X.iloc[(self.n_params):,].drop('y',axis=1)
         else:
             X['const']=1
             for item in range(self.n_params-1):
                 X[f'lag_{item+1}'] = np.roll(self.y, item+1)
-            X=X.iloc[(self.n_params-1):,].drop('y',axis=1)
+                X[f'lag_{item+1}'].iloc[:(item+1)] = np.nan
+            # X=X.iloc[(self.n_params-1):,].drop('y',axis=1)
 
-        return X
-
+        return X.drop('y', axis=1).iloc[1:,:]
     
 class STARmodel(BaseModel):
-    params: List[float] = Field(..., description="Model Parameters")
-    shift: np.ndarray = Field(..., description="Transition data")
-    data: np.ndarray = Field(..., description="Actual data")
+    shift_params: Dict[str, Any] = Field(..., description="Model Parameters")
+    # shift: np.ndarray = Field(..., description="Transition data")
+    # data: np.ndarray = Field(..., description="Actual data")
     
     class Config:
         arbitrary_types_allowed = True
 
-    ll_parameters=params[:-2]
-    
     def fit(self, type: str = "logistic", noise: str='gaussian', const=True) -> Dict[Any, Any]:
-        transition_params={"shift": self.shift,
-                           "gamma": self.params[-2],
-                           "threshold": self.params[-1]}
+        pass
+        # transition_params={"shift": self.shift,
+        #                    "gamma": self.shift_params[-2],
+        #                    "threshold": self.shift_params[-1]}
+        # ll_parameters = self.params[:-2]
+        # trigger = getattr(Transition_function(**transition_params), type)()
+        # # tail section of params vector contains: [..., sigma, gamma, threshold]]
+        # X = Design_matrix_ar(y=self.data, n_params=len(ll_parameters)-1, const=const).create()
+        # temp = len(trigger) - X.shape[0]
+        # X_g = X.copy().mul(trigger[temp:], axis='rows').drop('const',axis=1)
+        # X_g.columns = [f'{col}_g' for col in X_g.columns]
+        # X_full = X.join(X_g)
         
-        trigger = getattr(Transition_function(**transition_params), type)()
-        # tail section of params vector contains: [..., sigma, gamma, threshold]]
-        X = Design_matrix_ar(y=self.data, n_params=len(self.params)-3, const=const).create()
-        temp = len(trigger) - X.shape[0]
-        X_g = X.copy().mul(trigger[temp:], axis='rows').drop('const',axis=1)
-        X_g.columns = [f'{col}_g' for col in X_g.columns]
-        X_full = X.join(X_g)
-        init_params = self.params[:-2]
-        likelihood = likelihoods.Likelihood(params=init_params, X=X_full, y=self.data)
-        if noise != 'gaissian':
-            pass
+        # # not operational yet
+        # init_params = self.params[:-2]
+        # likelihood = likelihoods.Likelihood(params=init_params, X=X_full, y=self.data)
+        # if noise != 'gaissian':
+        #     pass
         
-        # to be finalized
-        result = minimize(likelihood.gaussian, init_params, method='Nelder-Mead')
+        # # to be finalized
+        # result = minimize(likelihood.gaussian, init_params, method='Nelder-Mead')
         
-    def simulate(self, type: str = "logistic", noise: str='normal'):
+    def simulate(self, n, params_regime_a, params_regime_b, type: str = "logistic", noise: str='normal', intercept: float=0.0, sigma: float=1.0):
+        if len(params_regime_a) != len(params_regime_b):
+            raise ValueError("Parameter lists for both regimes must have the same length.")
         if noise == "normal":
-            noise = stats.norm.rvs(size=len(self.data))
+            noise = stats.norm.rvs(size=n)*abs(sigma)
         else:
             ValueError("Unsupported noise distribution")
-        transition_params={"shift": self.shift,
-                           "gamma": self.gamma,
-                           "threshold": self.threshold}
-        pass       
+        transition_params = {"shift": model.shift_params['shift'],
+                            "gamma": self.shift_params['gamma'],
+                            "threshold": self.shift_params['threshold']}
+        
+        trigger=getattr(Transition_function(**transition_params),type)()
+        simulated = pd.Series()
+        m = len(params_regime_a)
+        # noise = np.insert(noise,0,np.repeat(np.nan,m))
+        # intercept = params_regime_a[0] if const else 0
+        for item in range(m,n):
+            if item < m:
+                simulated[item] = (
+                    intercept + np.dot(params_regime_a[:item], simulated[:item]) + noise[item] + np.dot(params_regime_a[:item], simulated[:item])*trigger[item] 
+                )
+            else:
+                simulated[item] = (
+                    intercept + np.dot(params_regime_a, simulated[(item - m) : item]) + noise[item] + np.dot(params_regime_a, simulated[(item - m) : item])*trigger[item]
+                )
+
+        return simulated
+            
+            
+        
+        
         
         
 def star1_model(parameters, trigger, data):
@@ -112,7 +136,7 @@ def star1_model(parameters, trigger, data):
     """
     gamma, c = parameters
     
-    transition = logistic_transition_function(trigger, gamma, c)
+    transition = Transition_function(trigger, gamma, c)
     
     # y = phi1 y_t-1 + phi2 y_t-1 * transition + epsilon_t
     
@@ -144,10 +168,15 @@ def star1_mle(parameters, trigger, data):
 
 
 if __name__ == "__main__":
+    shift = np.arange(0,200,1)
+    shift_params={"shift": shift,"gamma": 10, "threshold":9}
+    # shift_params=[10.0, 9.0]
     
+    model = STARmodel(shift_params=shift_params)
+    model.simulate(n=200,params_regime_a=[0.4], params_regime_b=[-0.4])
     
     transition_params= {"shift": np.arange(0,20), "gamma": 10, "threshold":9}
-    a=transition_function(**params)
+    a=Transition_function(**transition_params)
 
     # simulation
     np.random.seed(42)
@@ -158,7 +187,7 @@ if __name__ == "__main__":
     data = noise.copy()
     
     shift = np.arange(0,200,1)
-    transition = logistic_transition_function(shift, 50, 100)
+    transition = Transition_function(shift=shift, gamma=50, threshold=100).logistic
     
     for i in range(1, len(data)):
         data[i] = phi1 * data[i-1] * (1-transition[i]) + phi2*data[i-1]* transition[i] + noise[i]

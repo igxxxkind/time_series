@@ -1,6 +1,9 @@
-from time_series.estimators import Estimate
-from time_series.likelihoods import gaussian_log_likelihood
-from time_series.AR_models import modelParameters, simulateTSM
+from estimators import Estimators
+from likelihoods import Likelihood
+from AR_models import modelParameters, simulateTSM
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
 if __name__ == "__main__":
 # Example usage
     parameters_ar1 = {"phi": 0.5, "theta": None, "const": 0, "sigma": 1, "ksi": None}
@@ -89,15 +92,14 @@ if __name__ == "__main__":
     inputs_ar = {"parameters": parameters_ar1, "length": 200}
     test = simulateTSM(**inputs_ar).ARp()
 
-    Estimate(endog=pd.DataFrame(test[1:]), exog=pd.DataFrame(test[:-1])).OLS(const=True)[
+    Estimators(endog=pd.DataFrame(test[1:]), exog=pd.DataFrame(test[:-1])).OLS(const=True)[
+        "beta"
+    ]
+    Estimators(endog=pd.DataFrame(test[1:]), exog=pd.DataFrame(test[:-1])).MLE(const=True)[
         "beta"
     ]
 
-    Estimate(endog=pd.DataFrame(test[1:]), exog=pd.DataFrame(test[:-1])).MLE(
-        const=True
-    )["beta"]
-
-    res.values[1][0]
+   
 
 
     # simulateTSM(**inputs).AR1()
@@ -106,4 +108,3 @@ if __name__ == "__main__":
 
     sm.tsa.AutoReg(test, lags=1, trend="c").fit().summary()
 
-    sm.tsa.AutoReg(test, lags=1, trend="n").fit().summary()

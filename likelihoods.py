@@ -6,8 +6,8 @@ from typing import List, Union, Any
 
 class Likelihood(BaseModel):
     params: List[float] = Field(..., description="Model Parameters")
-    X: pd.DataFrame  = Field(..., description='Design Matrix')
-    y: np.ndarray = Field(..., description="Data Series")
+    X: pd.DataFrame = Field(..., description='Design Matrix')
+    y: pd.DataFrame = Field(..., description="Data Series")
     class Config:
         arbitrary_types_allowed = True
         
@@ -16,13 +16,15 @@ class Likelihood(BaseModel):
     def check_params(cls, data: Any) -> Any:
         if len(data['params'])>(data["X"].shape[1]+2):
             raise ValueError('Number of parameters is too large for the available likelihoods or the design matrix is too small')
+        else:
+            return data
 
-    def gaussian(self)-> float:
-        if len(self.params)>(self.X.shape[1]+1):
+    def gaussian(self, params: np.ndarray)-> float:
+        if len(params)>(self.X.shape[1]+1):
             raise ValueError("Too many paramaeters for the Gaussian likelihood")
-        sigma = abs(self.params[-1])
-        beta = self.params[:-1]
-        
+        sigma = abs(params[-1])
+        beta = params[:-1]
+
         fitted = pd.DataFrame(self.X @ beta)
         residuals = (self.y - fitted) / sigma
         n = len(residuals)

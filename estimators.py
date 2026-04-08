@@ -5,8 +5,8 @@ from pydantic import BaseModel, model_validator, Field
 import matplotlib.pyplot as plt
 from typing import Dict, List, Any, Optional, Union
 import pandas as pd
-from time_series.AR_models import modelParameters
-from time_series.likelihoods import gaussian_log_likelihood
+from AR_models import modelParameters
+from likelihoods import Likelihood
 from matplotlib import pyplot as plt
 
 class Estimators():
@@ -64,22 +64,21 @@ class Estimators():
         Returns:
             Dictionary: contains parameter estimations, standard errors, fitted values, and residuals.
         """
-        if  gaussian:
-            loglikelihood = gaussian_log_likelihood
-        else:
-            pass
         if const:
             X = np.column_stack((np.ones(len(self.endog)), self.exog))
         else:
             X = self.exog
         y = self.endog
         params = (
-            np.ones(X.shape[1] + 1) * 0.7
+            np.ones(X.shape[1]+ 1) * 0.7
         )  # parameters bor beta and sigma within the unit circle
+        if  gaussian:
+            loglikelihood = Likelihood(params=params.tolist(), X=pd.DataFrame(X), y=y)
+        else:
+            pass
         result = solver.minimize(
-            fun=loglikelihood,
+            fun=loglikelihood.gaussian,
             x0=params,
-            args=(X, y),
             method="BFGS",
             options={"maxiter": 10000, "disp": True},
         )
