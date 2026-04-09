@@ -284,3 +284,6 @@ class simulateTSM(BaseModel):
         simulated = self.MAq()
         return simulated
 
+if __name__ == "__main__":
+       
+    pass

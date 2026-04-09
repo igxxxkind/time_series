@@ -35,6 +35,7 @@ class Likelihood(BaseModel):
     def t_causal(self):
         # Placeholder for centralized t-distribution log likelihood
         # 
+        pass
         nu = abs(self.params[-1])
         sigma = abs(self.params[-2])
         beta = self.params[:-2]
